@@ -1,0 +1,44 @@
+* This dofile is for retention calculation in Stata
+* The data is simulated, with 50 individuals within 39 households.
+
+* 1. Check the data format to make sure it is date format. // 检查日期格式
+gen date = date(string(date_str), "YMD")  // 若你的日期是字符串
+format date %td  // 若本身就是日期格式则忽略
+
+* 2. Determine whether the user satisfies the retention condition. // 判断是否次日留存
+gen next_day = date + 1  // Generate the date of the next day after being observed. // 生成观测日期的次日
+gen retained = 0  // Generate the retention marker with the initial value of 0. // 生成留存标记，默认值为0
+sort pid date
+bysort pid (date): gen next_active = date[_n+1]  // Get the next observed date for each user. // 为每个用户提取下一条记录的日期（不一定是次日）
+
+replace retained = 1 if next_active == next_day  // Mark as 'retained' if user is active again on the next day. // 若用户次日仍活跃，则记为留存
+
+* 3. Summarise whether each individual is marked as retained at least once. // 计算每个用户是否"至少一次被留存"
+egen any_retained = max(retained), by(pid)  // Retained at least once if any daily retained = 1 // 若某天有留存，则该用户被标记为留存过
+
+* 4. Calculate the average retention rate across users. // 计算平均留存率（所有用户中，被留存用户的比例）
+mean any_retained
+
+
+****若改为平均家庭留存率****
+**1. SAME
+
+**2. Determine whether the household satisfies the retention condition. // 判断是否次日留存
+
+preserve  // Temporarily save the original data. //临时保存原始数据，以下逻辑基于家庭-日期维度处理
+keep hh_id date
+duplicates drop  // Ensure each household has only one record per day. // 保证每个家庭每天只算一次
+sort hh_id date
+
+gen next_day = date + 1  // Generate the next calendar day. // 生成次日
+gen retained_hh = 0  // Initialize retention flag. // 初始化留存标记
+gen next_active_hh = date[_n+1] if hh_id == hh_id[_n+1]  // Get the next activity date within the same household. // 获取下一个属于该家庭的活动日期
+replace retained_hh = 1 if next_active_hh == next_day  // Mark retained if activity occurs again the next day. // 若次日仍有记录则记为留存
+
+* 3. Summarise whether each household is retained at least once. // 计算每个家庭是否"至少一次被留存"
+egen any_retained_hh = max(retained_hh), by(hh_id)  // Flag households with at least one retained instance. // 只要有一次留存即视为该家庭被留存
+
+* 4. Calculate the average retention rate across households. // 计算平均留存率（被留存家庭在所有家庭中的比例）
+mean any_retained_hh
+
+restore  // 恢复原始完整数据
