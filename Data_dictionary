@@ -1,0 +1,5 @@
+- **pid**：用户唯一标识符
+- **hh_id**：家庭唯一标识符
+- **gameing_hours**：用户在该日期的游戏时间（小时）
+- **date**：记录日期，格式为 YYYY-MM-DD
+- **experience_rate**：用户对游戏的评价，取值为 'good' 或 'bad'
