@@ -1,0 +1,49 @@
+SELECT 
+  AVG(IF(DATEDIFF(next_date, curr_date) = 1, 1, 0)) AS avg_retention_rate
+FROM (
+    SELECT 
+        pid,
+        date AS curr_date,
+        LEAD(date) OVER (PARTITION BY pid ORDER BY date) AS next_date
+    FROM (
+        SELECT DISTINCT pid, date
+        FROM retention
+    ) AS uniq_pid_date
+) AS date_pairs;
+
+
+=====================================================================
+=====                     Explain / 解释                          ====
+=====================================================================
+
+-- 最终输出：计算所有用户每次登录后，第二天是否再次登录的平均概率。
+-- 类比于 STATA 中以“行为记录”为单位计算留存，并使用 cond 函数（此处为 IF）做条件判断。
+
+SELECT 
+  AVG(IF(DATEDIFF(next_date, curr_date) = 1, 1, 0)) AS avg_retention_rate  
+  -- 如果下一次登录日期是当前日期 + 1，就记为一次次日留存；求平均即为整体次日留存率。
+  -- DATEDIFF(date2, date1) 返回日期差值，IF 相当于 STATA 中 cond() 函数。
+
+FROM (
+
+  -- 构造每个用户所有登录日期的“当前登录日”和“下一次登录日”配对。
+  -- 因原数据中只有一列 date，我们需要额外生成 next_date，类比于 STATA 中：
+  --     bysort pid (date): gen next_active = date[_n+1]
+  SELECT 
+      pid,                                         -- 用户 ID
+      date AS curr_date,                           -- 当前登录日期
+      LEAD(date) OVER (PARTITION BY pid ORDER BY date) AS next_date  
+      -- 使用 LEAD 函数获取“下一条登录日期”，等价于 STATA 中 [_n+1]。
+      -- PARTITION BY pid 相当于 STATA 中的 by pid，ORDER BY date 相当于 sort pid date。
+
+  FROM (
+
+    -- 去重：确保每个用户每天只计入一条记录，防止重复登录影响统计。
+    -- 等价于 STATA 中：bysort pid (date): keep if _n == 1
+    SELECT DISTINCT pid, date
+    FROM retention                                 -- 原始登录记录表，应至少包含 pid 和 date 两列。
+
+  ) AS uniq_pid_date                                -- 子查询别名：用户-日期去重后的数据。
+
+) AS date_pairs                                      -- 子查询别名：当前日期与下一次登录日期配对。
+;
