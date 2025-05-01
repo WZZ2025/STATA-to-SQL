@@ -1,0 +1,9 @@
+Stata 命令	
+bysort pid (date): gen next_date = date[_n+1]	
+SQL 语句示例
+LEAD(date) OVER (PARTITION BY pid ORDER BY date) 
+
+Stata 命令
+gen retained = next_date == date + 1	
+SQL 语句示例
+CASE WHEN DATEDIFF(next_date, date) = 1 THEN 1 ELSE 0 END
